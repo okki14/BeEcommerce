@@ -18,16 +18,19 @@ app.use(express.static('public'))//buat image
 
 app.get('/',(req,res)=>{
     res.send('<h1>Welcome to Jungle</h1>')
+
 })
 
-const {
-    AuthRoutes,
-    TransactionRoutes
-    
-}=require('./src/routes')
+const {AuthRoutes,TransactionRoutes}=require('./src/routes')
 
 app.use('/auth',AuthRoutes)
 app.use('/trans',TransactionRoutes)
+
+// var schedule = require('node-schedule');
+ 
+// var j = schedule.scheduleJob('* /5 * * * *', function(firedate){
+//   console.log('The answer to life, the universe, and everything! '+firedate);
+// });
 
 
 app.listen(PORT,()=>{

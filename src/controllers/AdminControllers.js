@@ -148,7 +148,9 @@ module.exports={
             })
         },
         getproductkimia:(req,res)=>{
-            let sql=`select * from ecommerce.productkimia `
+            let sql=`SELECT product_id, kimia_id, dosis, harga 
+                FROM productkimia
+                join product on productkimia.product_id=product.id; `
             db.query(sql,(err,dataproduct)=>{
                 if (err) return res.status(500).send(err)
                 return res.status(200).send(dataproduct)

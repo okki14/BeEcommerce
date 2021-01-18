@@ -1,9 +1,20 @@
 const {db}=require('../conections')
-const {encrypt,transporter}=require('./../helpers')
+const {encrypt}=require('./../helpers')
+const nodemailer=require('nodemailer')
 const {createJWToken}=require('./../helpers/jwt')
 const fs=require('fs')
 const handlebars=require('handlebars')
 
+let transporter=nodemailer.createTransport({
+    service:'gmail',
+    auth:{
+        user:'purbasiahaan@gmail.com',
+        pass:'cpuedzwucfbpdasy'
+    },
+    tls:{
+        rejectUnauthorized:false
+    }
+})
 
 const DbPROMselect=(sql)=>{
     return new Promise((resolve,rejects)=>{
@@ -25,7 +36,7 @@ module.exports={
         const {username,email,password}=req.body
         let sql=`select * from user where username = ?`        
         db.query(sql,[username],(err,results)=>{
-            if (err) return res.status(500).send({message:"server down"})
+            if (err) return res.status(500).send({message:"server sedang down"})
             if(results.length){
                 return res.status(500).send({message:"username sudah terdaftar"})
             }else{
@@ -43,14 +54,17 @@ module.exports={
                    
                     db.query(sql,[results.insertId],(err,userslogin)=>{
                         if (err) return res.status(500).send({message:"server down"})
-
-                        const token=createJWToken({id:userslogin[0].id,username:userslogin[0].username})
-                        const link=`http://localhost:3000/verified?token=${token}`
+                        
                         const htmlrender=fs.readFileSync('./template/email.html','utf8')
+                        const token=createJWToken({id:userslogin[0].id,username:userslogin[0].username})
                         const template=handlebars.compile(htmlrender) 
+                        const link=`http://localhost:3000/verified?token=${token}`
                         const htmlemail=template({name:userslogin[0].username,link:link})
 
-                        transporter.sendMail({
+                        //untuk kirim email cuy   
+                        console.log('dwdwqd');
+
+                        transporter.sendMail ({
                             from:"Toko Engkong<purbasiahaan@gmail.com>",
                             to:email,
                             subject:'Tekan Tombol Confirm ',
@@ -108,6 +122,43 @@ module.exports={
         } catch (error) {
             return res.status(500).send({message:error.message})
         }
-    }
+    },
+    verified:(req,res)=>{
+        const{id}=req.user
+        var dataedit={
+            verified:true
+        }
+        console.log(req.token);
+        console.log(id);
+        let sql=`update user set ? where id = ${db.escape(id)}`
+        db.query(sql,dataedit,(err)=>{
+            if(err) return res.status(500).send({message:err.message})
+        sql=`select * from user  where id = ${db.escape(id)}`
+        console.log('absd');
+        db.query(sql,(err,results)=>{
+            if(err) return res.status(500).send({message:err.message})
+            results[0].token=req.token
+            res.send(results[0])
+        })
+    })
+    },
+    sendverified:(req,res)=>{
+        const{username,email,userid}=req.body
+        const htmlrender=fs.readFileSync('index.html','utf8')
+        const token=createJWToken({id:userid,username:username})//dgn token
+        const template=handlebars.compile(htmlrender)
+        const link=`http://localhost:3000/verified?token=${token}`//dgn token
+        const htmlemail=template({name:username,link:link})
+
+        transporter.sendMail({
+            from:'drag store <purbasiahaan@gmail.com',
+            to:email,
+            subject:'Waktunya Verified',
+            html:htmlemail
+        },(err)=>{
+            if(err) return res.status(500).send({message:err.message})
+            return res.send(true)
+        })
+    },
 
 }

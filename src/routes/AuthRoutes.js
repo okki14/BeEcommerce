@@ -1,11 +1,14 @@
 const Router=require('express').Router()
 const {AuthControllers}=require('./../controllers')
 const {AdminControllers}=require('../controllers')
+const {auth}=require('./../helpers/Auth')
 
 
 Router.post('/register',AuthControllers.register)
 Router.post('/login',AuthControllers.Login)
 Router.get('/keeplogin/:id',AuthControllers.keeplogin)
+Router.post('/sendverified',AuthControllers.sendverified)
+Router.get('/verified',auth,AuthControllers.verified)
 
 Router.post('/kimia', AdminControllers.AddKimia)
 Router.get('/getkimia', AdminControllers.GetKimia)

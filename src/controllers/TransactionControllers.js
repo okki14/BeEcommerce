@@ -1,19 +1,20 @@
 const {db}=require('../conections')
-// const {uploader}=require('./../helpers/uploader')
-// const {transporter}=require('./../helpers')
-// const fs=require('fs')
-// const handlebars=require('handlebars')
-// const QueryProm=(sql)=>{
-//     return new Promise((resolve,reject)=>{
-//         db.query(sql,(err,results)=>{
-//             if (err){
-//                 reject(err)
-//             }else{
-//                 resolve(results)
-//             } 
-//         })
-//     })
-// }
+const {uploader}=require('./../helpers/uploader')
+const {transporter}=require('./../helpers/mailers')
+const fs=require('fs')
+const handlebars=require('handlebars')
+
+const QueryProm=(sql)=>{
+    return new Promise((resolve,reject)=>{
+        db.query(sql,(err,results)=>{
+            if (err){
+                reject(err)
+            }else{
+                resolve(results)
+            } 
+        })
+    })
+}
 module.exports={
     Addtocart:(req,res)=>{
         const {userid,productid,qty}=req.body
@@ -55,7 +56,7 @@ module.exports={
                         // klo product di cart belum ada
                         let datainsert={
                             product_id:productid,
-                            transactions_id:results[0].id,
+                            transaction_id:results[0].id,
                             qty:qty
                         }
                         sql=`insert into product_transaction set ?`
@@ -83,7 +84,7 @@ module.exports={
                 let data={
                     tanggal:new Date(),
                     status:"oncart",
-                    users_id:userid
+                    user_id:userid
                 }
                 db.beginTransaction((err)=>{
                     if (err) { 
@@ -99,7 +100,7 @@ module.exports={
                         }
                         data={
                             product_id:productid,
-                            transactions_id:result1.insertId,
+                            transaction_id:result1.insertId,
                             qty:qty
                         }
                         sql=`insert into product_transaction set ?`
@@ -122,7 +123,6 @@ module.exports={
                                         where t.status='onCart' and t.user_id=? and pt.isdeleted=0;`
                                     db.query(sql,[userid],(err,datacart)=>{
                                     if (err){
-                                        console.log(err)
                                         return res.status(500).send(err)
                                     }
                                     return res.send(datacart)
@@ -136,11 +136,11 @@ module.exports={
     },
     getCart:(req,res)=>{
         const {userid}=req.query
-        sql=`select td.qty,p.namaproduct,p.banner,p.harga,p.id as idprod,t.id as idtrans 
-                from transactionsdetail td 
-                join transactions t on td.transactions_id=t.id 
-                join product p on td.product_id=p.id
-                where t.status='onCart' and t.users_id=? and td.isdeleted=0`
+        sql=`select pt.qty,p.namaprod,p.banner,p.harga,p.id as idprod,t.id as idtrans 
+            from product_transaction pt 
+            join transaction t on pt.transaction_id=t.id
+            join product p on pt.product_id=p.id
+            where t.status='onCart' and t.user_id=? and pt.isdeleted=0;`
         db.query(sql,[userid],(err,datacart)=>{
             if (err){
                 console.log(err)
@@ -148,144 +148,129 @@ module.exports={
             }
             return res.send(datacart)
         })
+    },    
+    onbayarCC:(req,res)=>{
+        const {idtrans,nomercc,datacart}=req.body
+        let sql=`update transaction set ? where id=${db.escape(idtrans)}` 
+        let dataupdate={
+            tanggal:new Date(),
+        status:'completed',
+        metode:'cc',
+        buktipembayaran:nomercc
     }
-    
-}
-
-
-
-
-
-
-
-
-
-// onbayarCC:(req,res)=>{
-//     const {idtrans,nomercc,datacart}=req.body
-//     let sql=`update transactions set ? where id=${db.escape(idtrans)}` 
-//     let dataupdate={
-//         tanggal:new Date(),
-//         status:'completed',
-//         metode:'cc',
-//         buktipembayaran:nomercc
-//     }
-//     db.query(sql,dataupdate,(err)=>{
-//         if (err){
-//             console.log(err)
-//             return res.status(500).send(err)
-//         }
-//         let arr=[]
-//         datacart.forEach((val)=>{
-//             arr.push(QueryProm(`update transactionsdetail set hargabeli=${val.harga} where transactions_id=${val.idtrans} and product_id=${val.idprod}`))
-//         })
-//         Promise.all(arr).then(()=>{
-//             return res.send('berhasil')// nggak perlu get cart lagi karena cart kalo berhasil otomatis kosong 
-//         }).catch((err)=>{
-//             console.log(err)
-//             return res.status(500).send(err)
-//         })
-
-//     })
-// },
-// uploadPembayaran:(req,res)=>{
-
-//     const path='/buktipembayaran'//ini terserah
-//     const upload=uploader(path,'BUKTI').fields([{ name: 'bukti'}])
-//     upload(req,res,(err)=>{
-//         if(err){
-//             return res.status(500).json({ message: 'Upload picture failed !', error: err.message });
-//         }
-//         const {bukti} = req.files;
-//         console.log(bukti)
-//         // console.log(robin)
-//         const imagePath = bukti ? path + '/' + bukti[0].filename : null;
-//         console.log(imagePath)
-//         // console.log(req.body.data)
-//         const data = JSON.parse(req.body.data); 
-//         let sql=`update transactions set ? where id=${db.escape(data.idtrans)}` 
-//         let dataupdate={
-//             tanggal:new Date(),
-//             status:'OnwaitingApprove',
-//             metode:'bukti',
-//             buktipembayaran:imagePath
-//         }
-//         db.query(sql,dataupdate,(err)=>{
-//             if (err){
-//                 if(imagePath){
-//                     fs.unlinkSync('./public'+imagePath)
-//                 }
-//                 return res.status(500).send(err)
-//             }
-//             return res.send('berhasil')// nggak perlu get cart lagi karena cart kalo berhasil otomatis kosong
-//         })
-//     })
-// },
-// getAdminwaittingApprove:(req,res)=>{
-//     let sql=`select * from transactions where status='onwaitingapprove'`
-//     db.query(sql,(err,waitingapprove)=>{
-//         if (err){
-//             console.log(err)
-//             return res.status(500).send(err)
-//         }
-//         return res.send(waitingapprove)
-//     })
-// },
-// AdminApprove:(req,res)=>{
-//     const {id}=req.params
-//     let sql=`update transactions set ? where id=${db.escape(id)}`
-//     let dataupdate={
-//         status:'completed'
-//     }
-//     db.query(sql,dataupdate,(err)=>{
-//         if (err){
-//             console.log(err)
-//             return res.status(500).send(err)
-//         }
-//         sql=`select * from transactions where id=${db.escape(id)}`
-//         db.query(sql,(err,datatrans)=>{
-//             if (err){
-//                 console.log(err)
-//                 return res.status(500).send(err)
-//             }
+    db.query(sql,dataupdate,(err)=>{
+        if (err){
+            console.log(err)
+            return res.status(500).send(err)
+        }
+        let arr=[]
+        datacart.forEach((val)=>{
+            arr.push(QueryProm(`update product_transacsion set hargabeli=${val.harga} where transaction_id=${val.idtrans} and product_id=${val.idprod}`))
+        })
+        Promise.all(arr).then(()=>{
+            return res.send('berhasil')
+        }).catch((err)=>{
+            console.log(err)
+            return res.status(500).send(err)
+        })
+        
+    })
+    },
+    uploadPembayaran:(req,res)=>{    
+    const path='/foto'
+    const upload=uploader(path,'Bukti').fields([{ name: 'bukti'}])
+    upload(req,res,(err)=>{
+        if(err){
+            return res.status(500).json({ message: 'Upload picture failed !', error: err.message });
+        }
+        const {bukti} = req.files;
+        const imagePath = bukti ? path + '/' + bukti[0].filename : null;
+        const data = JSON.parse(req.body.data); 
+        let sql=`update transaction set ? where id=${db.escape(data.idtrans)}` 
+        let dataupdate={
+            tanggal:new Date(),
+            status:'OnwaitingApprove',
+            metode:'bukti' ,
+            buktipembayaran:imagePath
+        }
+        db.query(sql,dataupdate,(err)=>{
+            if (err){
+                if(imagePath){
+                    fs.unlinkSync('./public'+imagePath)
+                }
+                return res.status(500).send(err)
+            }
+            return res.send('berhasil')
+        })
+    })
+    },
+    // getAdminwaittingApprove:(req,res)=>{
+    // let sql=`select * from transaction where status='onwaitingapprove'`
+    // db.query(sql,(err,waitingapprove)=>{
+    //     if (err){
+    //         console.log(err)
+    //         return res.status(500).send(err)
+    //     }
+    //     return res.send(waitingapprove)
+    // })
+    // },
+    // AdminApprove:(req,res)=>{
+    // const {id}=req.params
+    // let sql=`update transaction set ? where id=${db.escape(id)}`
+    // let dataupdate={
+    //     status:'completed'
+    // }
+    // db.query(sql,dataupdate,(err)=>{
+    //     if (err){
+    //         console.log(err)
+    //         return res.status(500).send(err)
+    //     }
+    //     sql=`select * from transaction where id=${db.escape(id)}`
+    //     db.query(sql,(err,datatrans)=>{
+    //         if (err){
+    //             console.log(err)
+    //             return res.status(500).send(err)
+    //         }
             
-//             sql=`select * from users where id=${db.escape(datatrans[0].users_id)}`
-//             db.query(sql,(err,datausers)=>{
-//                 if (err){
-//                     console.log(err)
-//                     return res.status(500).send(err)
-//                 }
-//                 const htmlrender=fs.readFileSync('./template/notif.html','utf8')//html berubah jadi string
-//                 const template=handlebars.compile(htmlrender) 
-//                 const htmlemail=template({message:'sleamat udah di approve bro'})
-//                 transporter.sendMail({
-//                     from:"Opentrip hiha <dinotestes12@gmail.com>",
-//                     to:datausers[0].email,
-//                     subject:'Payment',
-//                     html:htmlemail
-//                 },(err)=>{
-//                     if (err){
-//                         console.log(err)
-//                         return res.status(500).send(err)
-//                     }
-//                     this.getAdminwaittingApprove(req,res)
-//                 })
-//             })
-//         })
- 
-//     })
-// },
-// Adminreject:(req,res)=>{
-//     const {id}=req.params
-//     let sql=`update transactions set ? where id=${db.escape(id)}`
-//     let dataupdate={
-//         status:'rejected'
-//     }
-//     db.query(sql,dataupdate,(err)=>{
-//         if (err){
-//             console.log(err)
-//             return res.status(500).send(err)
-//         }
-//         this.getAdminwaittingApprove(req,res)
-
-//     })
-// }
+    //         sql=`select * from user where id=${db.escape(datatrans[0].users_id)}`
+    //         db.query(sql,(err,datausers)=>{
+    //             if (err){
+    //                 console.log(err)
+    //                 return res.status(500).send(err)
+    //             }
+    //             const htmlrender=fs.readFileSync('./template/notif.html','utf8')
+    //             const template=handlebars.compile(htmlrender) 
+    //             const htmlemail=template({message:'Transaksi Berhasil'})
+    //             transporter.sendMail({
+    //                 from:"Apotik CAHRO<purbasiahaan@gmail.com>",
+    //                 to:datausers[0].email,
+    //                 subject:'Payment',
+    //                 html:htmlemail
+    //             },(err)=>{
+    //                 if (err){
+    //                     console.log(err)
+    //                     return res.status(500).send(err)
+    //                 }
+    //                 this.getAdminwaittingApprove(req,res)
+    //             })
+    //         })
+    //     })
+        
+    // })
+    // },
+    // Adminreject:(req,res)=>{
+    // const {id}=req.params
+    // let sql=`update transaction set ? where id=${db.escape(id)}`
+    // let dataupdate={
+    //     status:'rejected'
+    // }
+    // db.query(sql,dataupdate,(err)=>{
+    //     if (err){
+    //         console.log(err)
+    //         return res.status(500).send(err)
+    //     }
+    //     this.getAdminwaittingApprove(req,res)
+        
+    // })
+    // }
+}
